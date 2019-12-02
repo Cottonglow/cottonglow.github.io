@@ -20,21 +20,21 @@ All the sample code used in this post is also available in this <a href="https:/
 So what actually is KEDA? KEDA, Kubernetes-based Event Driven Autoscaler, is an MIT licensed open source project from Microsoft and Red Hat that aims to provide better scaling options for your event-driven architectures on Kubernetes.
 
 Let's have a look at what this means. 
-Currently on Kubernetes, the HPA (Horizontal Pod Autoscaler) only reacts to resource based metrics such as CPU or memory usage or custom metrics. From my understanding, for event-driven applications where there could suddenly be a stream of data, this could be quite slow to scale up. Nevermind scaling back down once the data stream is lessening and removing the extra pods.  
+Currently on Kubernetes, the HPA (Horizontal Pod Autoscaler) only reacts to resource-based metrics such as CPU or memory usage or custom metrics. From my understanding, for event-driven applications where there could suddenly be a stream of data, this could be quite slow to scale up. Never mind scaling back down once the data stream is lessening and removing the extra pods.  
 I imagine paying for those unneeded resources all the time wouldn't be too fun!
 
 KEDA is more proactive. It monitors your event source and feeds this data back to the HPA resource. This way, KEDA can scale any container based on the number of events that need to be processed, before the CPU or memory usage goes up.
-You can also explicitly set which deployments KEDA should scale for you. So you can tell it to only scale a specific application, e.g. the consumer.
+You can also explicitly set which deployments KEDA should scale for you. So, you can tell it to only scale a specific application, e.g. the consumer.
 
 As KEDA seems to be able to just slot in to your cluster, it seems quite flexible on how you want to use it. You don't need to do a code change and you don't need to change your other containers. It only needs to be able to look at your event source and the deployment(s) you are interested in scaling.
 
-That felt like a lot of words! Let's have a look at this diagram for a high level view of what KEDA does.
+That felt like a lot of words! Let's have a look at this diagram for a high-level view of what KEDA does.
 
 ![KEDA](/img/exploring-keda/Keda.PNG)
 
 KEDA monitors your event source and regularly checks if there are any events. When needed, KEDA will then activate or deactivate your pod depending on whether there are any events. KEDA also exposes metric data to the HPA which handles the scaling to and from 1.
 
-This sounds fairly straightforward to me! Let's have a closer look at KEDA now.
+This sounds straightforward to me! Let's have a closer look at KEDA now.
 
 ## Deploying KEDA
 
@@ -95,7 +95,7 @@ So let's look at each property in the spec section and see what they are used fo
 scaleTargetRef:
     deploymentName: consumer-service
 ```
-This is the reference to the deployment that you want to scale. In this example, I have a `consumer-service` app that I want to scale depending on the amount of events coming through to Kafka.
+This is the reference to the deployment that you want to scale. In this example, I have a `consumer-service` app that I want to scale depending on the number of events coming through to Kafka.
 
 ```yml
 pollingInterval: 1 # Default is 30
@@ -107,7 +107,7 @@ cooldownPeriod:  60 # Default is 300
 ```
 The cooldown period is also in seconds and it is the period of time to wait after the last trigger activated before scaling back down to 0.
 
-But, what does activated mean and when is this? Having a look at the code and the docs, activated seems to be when KEDA last checked the event source and found that there were events, this sets the trigger to active.  
+But what does activated mean and when is this? Having a look at the code and the docs, activated seems to be when KEDA last checked the event source and found that there were events, this sets the trigger to active.  
 The next time KEDA looks at the event source and finds it empty, then the trigger is set to inactive and then kicks off the cool down period before scaling down to 0.
 
 This could be interesting to balance with the polling interval to make sure it doesn't scale down too fast before the events are done being consumed!
@@ -163,7 +163,7 @@ This is the name of the consumer group.
 lagThreshold: '3' # Default is 10
 ```
 This one actually took me a while to figure out, but that is probably down to my inexperience in this area!  
-From the documents this is described as how much the event stream is lagging. So I thought it was something with time.
+From the documents this is described as how much the event stream is lagging. So, I thought it was something with time.
 
 In reality, the lag refers to the number of records that haven't been read yet by the consumer.  
 KEDA checks against the total number of records in each of the partitions and the last consumed record. After some calculations, this is used to identify how much it should scale the deployments.
@@ -172,15 +172,72 @@ KEDA checks against the total number of records in each of the partitions and th
 For Kafka, the number of partitions in your topic affects how KEDA handles the scaling as it will **not** scale beyond the number of partitions you requested for your topic.
 
 # Example
+So, what does this look like in practice? In the sample repository you can find a very simple consumer service using Kafka as the event source. We will be using this to experiment with KEDA.
 
+If you want to try along as you read, you can find the instructions to start up the services in the README.
+
+Let's start!  
+
+The repository contains the Kafka and Zookeeper servers, a basic consumer service that simply outputs the messages from the Kafka topic and our KEDA scaler.
+
+Here is how the keda-sample namespace looks like before KEDA is started:
+
+{% highlight bash linenos %}
+$ kubectl get all -n keda-sample
+NAME                                                 READY   STATUS    RESTARTS   AGE
+pod/consumer-service-5887df99d7-hgcnc                1/1     Running   0          15s
+pod/kafka-cluster-entity-operator-784dbf5d5f-nkqz2   3/3     Running   0          29s
+pod/kafka-cluster-kafka-0                            2/2     Running   0          54s
+pod/kafka-cluster-zookeeper-0                        2/2     Running   0          78s
+
+NAME                                             TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                      AGE
+service/consumer-service                         ClusterIP   10.98.226.160    <none>        8090/TCP                     15s
+service/kafka-cluster-kafka-0                    NodePort    10.104.101.0     <none>        9094:32000/TCP               54s
+service/kafka-cluster-kafka-bootstrap            ClusterIP   10.106.255.132   <none>        9091/TCP,9092/TCP,9093/TCP   54s
+service/kafka-cluster-kafka-brokers              ClusterIP   None             <none>        9091/TCP,9092/TCP,9093/TCP   54s
+service/kafka-cluster-kafka-external-bootstrap   NodePort    10.97.47.72      <none>        9094:32100/TCP               54s
+service/kafka-cluster-zookeeper-client           ClusterIP   10.100.96.220    <none>        2181/TCP                     78s
+service/kafka-cluster-zookeeper-nodes            ClusterIP   None             <none>        2181/TCP,2888/TCP,3888/TCP   78s
+
+NAME                                            READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/consumer-service                1/1     1            1           15s
+deployment.apps/kafka-cluster-entity-operator   1/1     1            1           29s
+
+NAME                                                       DESIRED   CURRENT   READY   AGE
+replicaset.apps/consumer-service-5887df99d7                1         1         1       15s
+replicaset.apps/kafka-cluster-entity-operator-784dbf5d5f   1         1         1       29s
+
+NAME                                       READY   AGE
+statefulset.apps/kafka-cluster-kafka       1/1     54s
+statefulset.apps/kafka-cluster-zookeeper   1/1     78s
+{% endhighlight %}
+
+You can see that there is one pod for the consumer-service currently active.
+
+So, what happens after you start up the KEDA scaler?
+
+{% highlight bash linenos %}
+$ kubectl get all -n keda-sample
+NAME                                                 READY   STATUS    RESTARTS   AGE
+pod/kafka-cluster-entity-operator-784dbf5d5f-nkqz2   3/3     Running   0          12m
+pod/kafka-cluster-kafka-0                            2/2     Running   0          13m
+pod/kafka-cluster-zookeeper-0                        2/2     Running   0          13m
+
+...
+
+NAME                                                            REFERENCE                     TARGETS             MINPODS   MAXPODS   REPLICAS   AGE
+horizontalpodautoscaler.autoscaling/keda-hpa-consumer-service   Deployment/consumer-service   <unknown>/3 (avg)   1         10        0          10s
+{% endhighlight %}
+
+You can see that the HPA spun up and the consumer-service pod disappeared.
 
 # Jobs
 KEDA doesn't just scale deployments, but it can also scale your Kubernetes jobs.
 
-Although I haven't tried this out, it sounds quite interesting! Instead of having many events processed in your deployment and scaling up and down based on the amount of messages needing to be consumed, KEDA can spin up a job for each message in the event source.  
+Although I haven't tried this out, it sounds quite interesting! Instead of having many events processed in your deployment and scaling up and down based on the number of messages needing to be consumed, KEDA can spin up a job for each message in the event source.  
 Once a job completes its single message, it will terminate.
 
-You can configure how many parrallel jobs should be run at a time as well, similar to the maximum number of replicas you want in a deployment.
+You can configure how many parallel jobs should be run at a time as well, similar to the maximum number of replicas you want in a deployment.
 
 {: .box-note}
 KEDA offers this as a solution to handling long running executions as the job only terminates once the message is completed as opposed to deployments which terminate based on a timer.
