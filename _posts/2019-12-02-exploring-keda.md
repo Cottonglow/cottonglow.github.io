@@ -5,7 +5,6 @@ subtitle: A brief look at KEDA using Kafka triggers
 gh-repo: Cottonglow/kafka-integration-with-keda
 gh-badge: [star, fork, follow]
 tags: [keda, kafka, kubernetes, research]
-comments: true
 published: true
 ---
 
@@ -32,7 +31,7 @@ That felt like a lot of words! Let's have a look at this diagram for a high-leve
 
 ![KEDA](/img/exploring-keda/Keda.PNG)
 
-KEDA monitors your event source and regularly checks if there are any events. When needed, KEDA will then activate or deactivate your pod depending on whether there are any events by setting the deployment's replica count to 1 or 0. KEDA also exposes metric data to the HPA which handles the scaling to and from 1.
+KEDA monitors your event source and regularly checks if there are any events. When needed, KEDA will then activate or deactivate your pod depending on whether there are any events by setting the deployment's replica count to 1 or 0, depending on your minimum replica count. KEDA also exposes metric data to the HPA which handles the scaling to and from 1.
 
 This sounds straightforward to me! Let's have a closer look at KEDA now.
 
@@ -107,8 +106,9 @@ cooldownPeriod:  60 # Default is 300
 ```
 The cooldown period is also in seconds and it is the period of time to wait after the last trigger activated before scaling back down to 0.
 
-But what does activated mean and when is this? Having a look at the code and the documentation, activated seems to be when KEDA last checked the event source and found that there were events, this sets the trigger to active.  
-The next time KEDA looks at the event source and finds it empty, then the trigger is set to inactive and then kicks off the cool down period before scaling down to 0.
+But what does activated mean and when is this? Having a look at the code and the documentation, activated is the time at which KEDA last checked the event source and found that there were events, this sets the trigger to active.  
+The next time KEDA looks at the event source and finds it empty, then the trigger is set to inactive and then kicks off the cool down period before scaling down to 0.  
+This timer is cancelled if any events are detected again in the event source.
 
 This could be interesting to balance with the polling interval to make sure it doesn't scale down too fast before the events are done being consumed!
 
@@ -157,7 +157,7 @@ Here you can list the brokers that KEDA should monitor on as a comma separated l
 ```yml
 consumerGroup: testSample
 ```
-This is the name of the consumer group and should be the same one as the one that is consuming the events from the topic. Presumably so that KEDA knows which offsets to look at.
+This is the name of the consumer group and should be the same one as the one that is consuming the events from the topic so that KEDA knows which offsets to look at.
 
 ```yml
 lagThreshold: '3' # Default is 10
