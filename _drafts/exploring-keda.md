@@ -5,7 +5,7 @@ subtitle: A brief look at KEDA using Kafka triggers
 gh-repo: Cottonglow/kafka-integration-with-keda
 gh-badge: [star, fork, follow]
 tags: [keda, kafka, kubernetes, research]
-comments: false
+comments: true
 published: true
 ---
 
@@ -32,7 +32,7 @@ That felt like a lot of words! Let's have a look at this diagram for a high-leve
 
 ![KEDA](/img/exploring-keda/Keda.PNG)
 
-KEDA monitors your event source and regularly checks if there are any events. When needed, KEDA will then activate or deactivate your pod depending on whether there are any events. KEDA also exposes metric data to the HPA which handles the scaling to and from 1.
+KEDA monitors your event source and regularly checks if there are any events. When needed, KEDA will then activate or deactivate your pod depending on whether there are any events by setting the deployment's replica count to 1 or 0. KEDA also exposes metric data to the HPA which handles the scaling to and from 1.
 
 This sounds straightforward to me! Let's have a closer look at KEDA now.
 
