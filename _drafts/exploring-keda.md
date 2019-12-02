@@ -227,7 +227,7 @@ NAME                                                            REFERENCE       
 horizontalpodautoscaler.autoscaling/keda-hpa-consumer-service   Deployment/consumer-service   <unknown>/3 (avg)   1         10        0          10s
 {% endhighlight %}
 
-You can see that the HPA spun up and the consumer-service pod disappeared.
+You can see that the HPA is created and the consumer-service pod disappeared.
 
 Let's try and send one message to the Kafka topic.
 
@@ -236,6 +236,44 @@ $ ./kafka-console-producer.bat --broker-list localhost:32100 --topic messages
 >Hello World
 {% endhighlight %}
 
+{% highlight bash linenos %}
+$ kubectl get all -n keda-sample
+NAME                                                 READY   STATUS    RESTARTS   AGE
+pod/consumer-service-5887df99d7-4g6jk                1/1     Running   0          68s
+...
+NAME                                                            REFERENCE                     TARGETS     MINPODS   MAXPODS   REPLICAS   AGE
+horizontalpodautoscaler.autoscaling/keda-hpa-consumer-service   Deployment/consumer-service   0/3 (avg)   1         10        1          149m
+{% endhighlight %}
+
+A new consumer-service pod is back up! Once the cooldown period has passed, we can see that the pod was removed again since we haven't sent another message to Kafka.
+
+{% highlight bash linenos %}
+$ kubectl get all -n keda-sample
+NAME                                                 READY   STATUS    RESTARTS   AGE
+pod/kafka-cluster-entity-operator-784dbf5d5f-nkqz2   3/3     Running   0          162m
+pod/kafka-cluster-kafka-0                            2/2     Running   0          162m
+pod/kafka-cluster-zookeeper-0                        2/2     Running   0          163m
+...
+NAME                                                            REFERENCE                     TARGETS             MINPODS   MAXPODS   REPLICAS   AGE
+horizontalpodautoscaler.autoscaling/keda-hpa-consumer-service   Deployment/consumer-service   <unknown>/3 (avg)   1         10        0          149m
+{% endhighlight %}
+
+What happens if I send many messages at once to Kafka? Let's see!
+
+{% highlight bash linenos %}
+$ kubectl get all -n keda-sample
+NAME                                                 READY   STATUS    RESTARTS   AGE
+pod/consumer-service-5887df99d7-54gqf                1/1     Running   0          17s
+pod/consumer-service-5887df99d7-7gv8m                1/1     Running   0          39s
+pod/consumer-service-5887df99d7-d5tg5                1/1     Running   0          33s
+pod/consumer-service-5887df99d7-kzrm5                1/1     Running   0          33s
+pod/consumer-service-5887df99d7-t4fnm                1/1     Running   0          33s
+...
+NAME                                                            REFERENCE                     TARGETS     MINPODS   MAXPODS   REPLICAS   AGE
+horizontalpodautoscaler.autoscaling/keda-hpa-consumer-service   Deployment/consumer-service   0/3 (avg)   1         10        5          3h3m
+{% endhighlight %}
+
+There are 5 pods up! It won't create more than that as I only have 5 partitions set in my Kafka topic.
 
 # Jobs
 KEDA doesn't just scale deployments, but it can also scale your Kubernetes jobs.
