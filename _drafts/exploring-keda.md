@@ -174,11 +174,10 @@ For Kafka, the number of partitions in your topic affects how KEDA handles the s
 # Example
 So, what does this look like in practice? In the sample repository you can find a very simple consumer service using Kafka as the event source. We will be using this to experiment with KEDA.
 
+The repository contains the Kafka and Zookeeper servers, a basic consumer service that simply outputs the messages from the Kafka topic and our KEDA scaler.  
 If you want to try along as you read, you can find the instructions to start up the services in the README.
 
 Let's start!  
-
-The repository contains the Kafka and Zookeeper servers, a basic consumer service that simply outputs the messages from the Kafka topic and our KEDA scaler.
 
 Here is how the keda-sample namespace looks like before KEDA is started:
 
@@ -229,7 +228,7 @@ horizontalpodautoscaler.autoscaling/keda-hpa-consumer-service   Deployment/consu
 
 You can see that the HPA is created and the consumer-service pod disappeared.
 
-Let's try and send one message to the Kafka topic.
+Let's try and send a message to the Kafka topic.
 
 {% highlight bash linenos %}
 $ ./kafka-console-producer.bat --broker-list localhost:32100 --topic messages
@@ -245,7 +244,7 @@ NAME                                                            REFERENCE       
 horizontalpodautoscaler.autoscaling/keda-hpa-consumer-service   Deployment/consumer-service   0/3 (avg)   1         10        1          149m
 {% endhighlight %}
 
-A new consumer-service pod is back up! Once the cooldown period has passed, we can see that the pod is removed again since we haven't sent another message to Kafka.
+A new consumer-service pod is back up! Once the cooldown period has passed, we can see that the pod is removed again as there were no more events in the topic.
 
 {% highlight bash linenos %}
 $ kubectl get all -n keda-sample
@@ -274,6 +273,55 @@ horizontalpodautoscaler.autoscaling/keda-hpa-consumer-service   Deployment/consu
 {% endhighlight %}
 
 There are 5 pods up! It won't create more than that as I only have 5 partitions set in my Kafka topic.
+
+So, I see what happens when I manually send messages here and there, but what happens in a more real situation when there is a stream of messages?
+
+{% highlight bash linenos %}
+./kafka-producer-perf-test.bat --topic messages --throughput 3 --num-records 1000 --record-size 4 --producer-props bootstrap.servers=localhost:32100
+{% endhighlight %}
+
+This command will send 1000 messages to the topic, throttled at 3 per second.
+
+{% highlight bash linenos %}
+$ kubectl get all -n keda-sample
+NAME                                                 READY   STATUS              RESTARTS   AGE
+pod/consumer-service-5887df99d7-nvqkn                0/1     ContainerCreating   0          2s
+pod/consumer-service-5887df99d7-wwgqp                1/1     Running             0          2m4s
+pod/consumer-service-5887df99d7-zk5l9                1/1     Running             0          2m5s
+...
+NAME                                                            REFERENCE                     TARGETS     MINPODS   MAXPODS   REPLICAS   AGE
+horizontalpodautoscaler.autoscaling/keda-hpa-consumer-service   Deployment/consumer-service   4/3 (avg)   1         10        2          4h37m
+{% endhighlight %}
+
+You can see more pods getting created over time to help handle the events that are coming in. 
+
+{% highlight bash linenos %}
+$ kubectl get all -n keda-sample
+NAME                                                 READY   STATUS    RESTARTS   AGE
+pod/consumer-service-5887df99d7-5q59s                1/1     Running   0          3m48s
+pod/consumer-service-5887df99d7-nvqkn                1/1     Running   0          4m3s
+pod/consumer-service-5887df99d7-vqtbg                1/1     Running   0          3m48s
+pod/consumer-service-5887df99d7-wwgqp                1/1     Running   0          6m5s
+pod/consumer-service-5887df99d7-zk5l9                1/1     Running   0          6m6s
+...
+NAME                                                            REFERENCE                     TARGETS     MINPODS   MAXPODS   REPLICAS   AGE
+horizontalpodautoscaler.autoscaling/keda-hpa-consumer-service   Deployment/consumer-service   0/3 (avg)   1         10        5          4h41m
+{% endhighlight %}
+
+And once no more events are found in the topic, the deployments get scaled back down.
+
+{% highlight bash linenos %}
+$ kubectl get all -n keda-sample
+NAME                                                 READY   STATUS        RESTARTS   AGE
+pod/consumer-service-5887df99d7-5q59s                0/1     Terminating   0          4m18s
+pod/consumer-service-5887df99d7-nvqkn                0/1     Terminating   0          4m33s
+pod/consumer-service-5887df99d7-vqtbg                0/1     Terminating   0          4m18s
+pod/consumer-service-5887df99d7-wwgqp                0/1     Terminating   0          6m35s
+pod/consumer-service-5887df99d7-zk5l9                1/1     Terminating   0          6m36s
+...
+NAME                                                            REFERENCE                     TARGETS     MINPODS   MAXPODS   REPLICAS   AGE
+horizontalpodautoscaler.autoscaling/keda-hpa-consumer-service   Deployment/consumer-service   0/3 (avg)   1         10        5          4h41m
+{% endhighlight %}
 
 # Jobs
 KEDA doesn't just scale deployments, but it can also scale your Kubernetes jobs.
