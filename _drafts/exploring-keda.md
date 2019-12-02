@@ -130,7 +130,7 @@ This is the list of triggers to use to activate the scaling. In this example, I 
 
 # Kafka Trigger
 
-Although KEDA supports multiple types of event sources, we will be looking at using the Kafka scaler in this post.
+Although KEDA supports multiple types of event source, we will be looking at using the Kafka scaler in this post.
 
 {% highlight yml linenos %}
 triggers:
@@ -157,13 +157,13 @@ Here you can list the brokers that KEDA should monitor on. Looking at the code, 
 ```yml
 consumerGroup: testSample
 ```
-This is the name of the consumer group.
+This is the name of the consumer group and should be the same one as the one that is consuming the events from the topic. Presumably so that KEDA knows which offsets to look at.
 
 ```yml
 lagThreshold: '3' # Default is 10
 ```
 This one actually took me a while to figure out, but that is probably down to my inexperience in this area!  
-From the documents this is described as how much the event stream is lagging. So, I thought it was something with time.
+In the documentation, this is described as how much the event stream is lagging. So, I thought it was something with time.
 
 In reality, the lag refers to the number of records that haven't been read yet by the consumer.  
 KEDA checks against the total number of records in each of the partitions and the last consumed record. After some calculations, this is used to identify how much it should scale the deployments.
@@ -222,25 +222,31 @@ NAME                                                 READY   STATUS    RESTARTS 
 pod/kafka-cluster-entity-operator-784dbf5d5f-nkqz2   3/3     Running   0          12m
 pod/kafka-cluster-kafka-0                            2/2     Running   0          13m
 pod/kafka-cluster-zookeeper-0                        2/2     Running   0          13m
-
 ...
-
 NAME                                                            REFERENCE                     TARGETS             MINPODS   MAXPODS   REPLICAS   AGE
 horizontalpodautoscaler.autoscaling/keda-hpa-consumer-service   Deployment/consumer-service   <unknown>/3 (avg)   1         10        0          10s
 {% endhighlight %}
 
 You can see that the HPA spun up and the consumer-service pod disappeared.
 
+Let's try and send one message to the Kafka topic.
+
+{% highlight bash linenos %}
+$ ./kafka-console-producer.bat --broker-list localhost:32100 --topic messages
+>Hello World
+{% endhighlight %}
+
+
 # Jobs
 KEDA doesn't just scale deployments, but it can also scale your Kubernetes jobs.
 
 Although I haven't tried this out, it sounds quite interesting! Instead of having many events processed in your deployment and scaling up and down based on the number of messages needing to be consumed, KEDA can spin up a job for each message in the event source.  
-Once a job completes its single message, it will terminate.
+Once a job completes processing its single message, it will terminate.
 
 You can configure how many parallel jobs should be run at a time as well, similar to the maximum number of replicas you want in a deployment.
 
 {: .box-note}
-KEDA offers this as a solution to handling long running executions as the job only terminates once the message is completed as opposed to deployments which terminate based on a timer.
+KEDA offers this as a solution to handling long running executions as the job only terminates once the message processing has completed as opposed to deployments which terminate based on a timer.
 
 # Resources
 
