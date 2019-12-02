@@ -9,7 +9,7 @@ comments: false
 published: true
 ---
 
-With KEDA releasing version 1, it is a good time to have a quick look at what it is and what it does!
+With the release of KEDA version 1, it is a good time to have a quick look at what it is and what it does!
 
 In this post I will investigate the basics of KEDA using a Kafka trigger and look at what the properties mean and how it affects the scaling of your pods.
 
@@ -17,7 +17,7 @@ All the sample code used in this post is also available in this <a href="https:/
 
 # KEDA 
 
-So what actually is KEDA? KEDA, Kubernetes-based Event Driven Autoscaler, is an MIT licensed open source project from Microsoft and Red Hat that aims to provide better scaling options for your event-driven architectures on Kubernetes.
+So what actually is KEDA? KEDA (Kubernetes-based Event Driven Autoscaler) is an MIT licensed open source project from Microsoft and Red Hat that aims to provide better scaling options for your event-driven architectures on Kubernetes.
 
 Let's have a look at what this means. 
 Currently on Kubernetes, the HPA (Horizontal Pod Autoscaler) only reacts to resource-based metrics such as CPU or memory usage or custom metrics. From my understanding, for event-driven applications where there could suddenly be a stream of data, this could be quite slow to scale up. Never mind scaling back down once the data stream is lessening and removing the extra pods.  
@@ -26,7 +26,7 @@ I imagine paying for those unneeded resources all the time wouldn't be too fun!
 KEDA is more proactive. It monitors your event source and feeds this data back to the HPA resource. This way, KEDA can scale any container based on the number of events that need to be processed, before the CPU or memory usage goes up.
 You can also explicitly set which deployments KEDA should scale for you. So, you can tell it to only scale a specific application, e.g. the consumer.
 
-As KEDA seems to be able to just slot in to your cluster, it seems quite flexible on how you want to use it. You don't need to do a code change and you don't need to change your other containers. It only needs to be able to look at your event source and the deployment(s) you are interested in scaling.
+As KEDA can be added to your existing cluster, it is quite flexible on how you want to use it. You don't need to do a code change and you don't need to change your other containers. It only needs to be able to look at your event source and the deployment(s) you are interested in scaling.
 
 That felt like a lot of words! Let's have a look at this diagram for a high-level view of what KEDA does.
 
@@ -45,7 +45,7 @@ There are two ways to deploy KEDA into your Kubernetes cluster:
 1. Helm
 1. Deploy yaml 
 
-So what gets deployed? By the looks of it, the deployment contains the KEDA operator, roles and role bindings and these custom resources:
+So what gets deployed? The deployment contains the KEDA operator, roles and role bindings and these custom resources:
 
 * ScaledObject
 
@@ -107,7 +107,7 @@ cooldownPeriod:  60 # Default is 300
 ```
 The cooldown period is also in seconds and it is the period of time to wait after the last trigger activated before scaling back down to 0.
 
-But what does activated mean and when is this? Having a look at the code and the docs, activated seems to be when KEDA last checked the event source and found that there were events, this sets the trigger to active.  
+But what does activated mean and when is this? Having a look at the code and the documentation, activated seems to be when KEDA last checked the event source and found that there were events, this sets the trigger to active.  
 The next time KEDA looks at the event source and finds it empty, then the trigger is set to inactive and then kicks off the cool down period before scaling down to 0.
 
 This could be interesting to balance with the polling interval to make sure it doesn't scale down too fast before the events are done being consumed!
@@ -152,7 +152,7 @@ This is the name of the topic that you want to check the events in.
 ```yml
 brokerList: kafka-cluster-kafka-bootstrap.keda-sample:9092
 ```
-Here you can list the brokers that KEDA should monitor on. Looking at the code, this seems to be a comma separated list.
+Here you can list the brokers that KEDA should monitor on as a comma separated list.
 
 ```yml
 consumerGroup: testSample
@@ -245,7 +245,7 @@ NAME                                                            REFERENCE       
 horizontalpodautoscaler.autoscaling/keda-hpa-consumer-service   Deployment/consumer-service   0/3 (avg)   1         10        1          149m
 {% endhighlight %}
 
-A new consumer-service pod is back up! Once the cooldown period has passed, we can see that the pod was removed again since we haven't sent another message to Kafka.
+A new consumer-service pod is back up! Once the cooldown period has passed, we can see that the pod is removed again since we haven't sent another message to Kafka.
 
 {% highlight bash linenos %}
 $ kubectl get all -n keda-sample
