@@ -19,10 +19,11 @@ All the sample code used in this post is also available in this <a href="https:/
 
 So what actually is KEDA? KEDA, Kubernetes-based Event Driven Autoscaler, is an MIT licensed open source project from Microsoft and Red Hat that aims to provide better scaling options for your event-driven architectures on Kubernetes.
 
-Let's have a look at what this means. Currently the way Kubernetes works, it only reacts to resource based metrics such as CPU or memory or custom metrics. From my understanding, for event-driven applications where there could suddenly be a stream of data, this could be quite slow to scale up. Nevermind scaling back down once the data stream is lessening and removing the extra pods.  
+Let's have a look at what this means. 
+Currently on Kubernetes, the HPA (Horizontal Pod Autoscaler) only reacts to resource based metrics such as CPU or memory usage or custom metrics. From my understanding, for event-driven applications where there could suddenly be a stream of data, this could be quite slow to scale up. Nevermind scaling back down once the data stream is lessening and removing the extra pods.  
 I imagine paying for those unneeded resources all the time wouldn't be too fun!
 
-KEDA is more proactive. It monitors your event source and feeds this data back to the Horizontal Pod Autoscaler resource. This way, KEDA can scale any container based on the number of events that need to be processed, before the CPU or memory usage goes up.
+KEDA is more proactive. It monitors your event source and feeds this data back to the HPA resource. This way, KEDA can scale any container based on the number of events that need to be processed, before the CPU or memory usage goes up.
 You can also explicitly set which deployments KEDA should scale for you. So you can tell it to only scale a specific application, e.g. the consumer.
 
 As KEDA seems to be able to just slot in to your cluster, it seems quite flexible on how you want to use it. You don't need to do a code change and you don't need to change your other containers. It only needs to be able to look at your event source and the deployment(s) you are interested in scaling.
@@ -31,7 +32,7 @@ That felt like a lot of words! Let's have a look at this diagram for a high leve
 
 ![KEDA](/img/exploring-keda/Keda.PNG)
 
-KEDA monitors your event source and regularly checks if there are any events. When needed, KEDA will then activate or deactivate your pod depending on whether there are any events. KEDA also exposes metric data to the Horizontal Pod Autoscaler which handles the scaling to and from 1.
+KEDA monitors your event source and regularly checks if there are any events. When needed, KEDA will then activate or deactivate your pod depending on whether there are any events. KEDA also exposes metric data to the HPA which handles the scaling to and from 1.
 
 This sounds fairly straightforward to me! Let's have a closer look at KEDA now.
 
@@ -53,7 +54,7 @@ So what gets deployed? By the looks of it, the deployment contains the KEDA oper
 
   If required, this resource contains the authentication configuration needed for monitoring the event source.
 
-The scaled object controller also creates the Horizontal Pod Autoscaler for you.
+The scaled object controller also creates the HPA for you.
 
 ## ScaledObject Properties
 
